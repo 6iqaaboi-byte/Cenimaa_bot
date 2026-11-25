@@ -4,8 +4,10 @@ import os
 import requests
 from bs4 import BeautifulSoup
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-CHAT_ID = os.environ["CHAT_ID"]
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip()
+CHAT_ID = os.environ.get("CHAT_ID", "").strip()
+if not BOT_TOKEN or not CHAT_ID:
+    raise SystemExit("BOT_TOKEN or CHAT_ID is empty - check GitHub secrets")
 
 SITE_URL = "https://cfc.scenecinemas.com/"
 STATE_FILE = "movies.json"
@@ -44,8 +46,11 @@ def fetch_movies():
 
 def load_state():
     if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return None
     return None
 
 
@@ -89,9 +94,12 @@ def main():
 
     known = load_state()
 
-    if known is None:
+    if not known:
+        # أول تشغيل أو الملف فاضي: كل الأفلام تتعامل كأنها جديدة
+        known = {}
+        for url, title in current.items():
+            send_message(f"🎬 فيلم جديد نزل: {title}\n{url}")
         save_state(current)
-        send_message(f"البوت اشتغل ✅\nعدد الأفلام دلوقتي: {len(current)}")
     else:
         new_urls = [u for u in current if u not in known]
         for url in new_urls:
